@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Buffer } from "buffer";
 import process from "process";
 import { ethers } from "ethers";
+import "./App.css";
 
 // Inject polyfills
 window.Buffer = Buffer;
@@ -9,6 +10,16 @@ window.process = process;
 
 // Contract ABI definition
 const abi = [
+  {
+    inputs: [
+      { internalType: "string", name: "_title", type: "string" },
+      { internalType: "string", name: "_description", type: "string" }
+    ],
+    name: "createProposal",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
+  },
   {
     inputs: [
       { internalType: "uint256[2]", name: "_pA", type: "uint256[2]" },
@@ -40,6 +51,8 @@ const abi = [
   }
 ];
 
+const CONTRACT_ADDRESS = "0xF3396E94f9a2a0b3A7F931EEBD5883878Dd2Fa26";
+
 function App() {
   const [vote, setVote] = useState(null);
   const [secret, setSecret] = useState("");
@@ -51,6 +64,11 @@ function App() {
   const [currentAccount, setCurrentAccount] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showNewProposal, setShowNewProposal] = useState(false);
+  const [newProposal, setNewProposal] = useState({ title: "", description: "" });
+  const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
+  const [proposals, setProposals] = useState([]);
+  const [submitError, setSubmitError] = useState(null);
 
   // Call updateCurrentAccount when component mounts and when account changes
   useEffect(() => {
@@ -341,6 +359,56 @@ function App() {
     }
   };
 
+  // Add this new function to handle proposal submission
+  const handleProposalSubmit = async () => {
+    // Reset error state
+    setSubmitError(null);
+
+    // Validate inputs
+    if (!newProposal.title.trim()) {
+      setSubmitError("Please enter a proposal title");
+      return;
+    }
+    if (!newProposal.description.trim()) {
+      setSubmitError("Please enter a proposal description");
+      return;
+    }
+    if (!currentAccount) {
+      setSubmitError("Please connect your wallet first");
+      return;
+    }
+
+    setIsSubmittingProposal(true);
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const votingContract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+
+      console.log("Creating proposal:", newProposal);
+      const tx = await votingContract.createProposal(
+        newProposal.title,
+        newProposal.description
+      );
+
+      console.log("Waiting for transaction confirmation...");
+      await tx.wait();
+      console.log("Proposal created successfully!");
+
+      // Clear form and close modal
+      setNewProposal({ title: "", description: "" });
+      setShowNewProposal(false);
+
+      // Show success message
+      alert("✅ Proposal created successfully!");
+
+    } catch (error) {
+      console.error("Error creating proposal:", error);
+      setSubmitError(error.message || "Failed to create proposal. Please try again.");
+    } finally {
+      setIsSubmittingProposal(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -351,6 +419,213 @@ function App() {
         position: "relative",
       }}
     >
+      {/* New Proposal Button */}
+      <div style={{
+        position: "absolute",
+        top: "1rem",
+        left: "1rem",
+        zIndex: 1000,
+      }}>
+        <button
+          onClick={() => setShowNewProposal(true)}
+          style={{
+            backgroundColor: "#00c853",
+            color: "white",
+            border: "none",
+            padding: "10px 16px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "1rem",
+          }}
+        >
+          <span role="img" aria-label="new">➕</span>
+          NEW PROPOSAL
+        </button>
+      </div>
+
+      {/* New Proposal Page */}
+      {showNewProposal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "#121212",
+          zIndex: 2000,
+          padding: "2rem",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          overflowY: "auto", // Allow scrolling if content is too long
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: "800px",
+            margin: "0 auto",
+          }}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "2rem",
+            }}>
+              <h1 style={{ color: "white", margin: 0 }}>Create New Proposal</h1>
+              <button
+                onClick={() => !isSubmittingProposal && setShowNewProposal(false)}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "none",
+                  color: "white",
+                  fontSize: "1.5rem",
+                  cursor: isSubmittingProposal ? "not-allowed" : "pointer",
+                  opacity: isSubmittingProposal ? 0.5 : 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {submitError && (
+              <div style={{
+                backgroundColor: "rgba(255, 0, 0, 0.1)",
+                border: "1px solid #ff4444",
+                color: "#ff4444",
+                padding: "1rem",
+                borderRadius: "5px",
+                marginBottom: "1.5rem",
+              }}>
+                ❌ {submitError}
+              </div>
+            )}
+
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.5rem",
+            }}>
+              <div>
+                <label
+                  style={{
+                    color: "white",
+                    display: "block",
+                    marginBottom: "0.5rem",
+                    fontSize: "1.1rem",
+                  }}
+                >
+                  Proposal Title *
+                </label>
+                <input
+                  type="text"
+                  value={newProposal.title}
+                  onChange={(e) => {
+                    setNewProposal({ ...newProposal, title: e.target.value });
+                    setSubmitError(null); // Clear error when user types
+                  }}
+                  placeholder="Enter your proposal title"
+                  disabled={isSubmittingProposal}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    backgroundColor: "#1e1e1e",
+                    border: "1px solid #333",
+                    borderRadius: "5px",
+                    color: "white",
+                    fontSize: "1rem",
+                    opacity: isSubmittingProposal ? 0.7 : 1,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    color: "white",
+                    display: "block",
+                    marginBottom: "0.5rem",
+                    fontSize: "1.1rem",
+                  }}
+                >
+                  Proposal Description *
+                </label>
+                <textarea
+                  value={newProposal.description}
+                  onChange={(e) => {
+                    setNewProposal({ ...newProposal, description: e.target.value });
+                    setSubmitError(null); // Clear error when user types
+                  }}
+                  placeholder="Describe your proposal in detail..."
+                  disabled={isSubmittingProposal}
+                  style={{
+                    width: "100%",
+                    height: "200px",
+                    padding: "12px",
+                    backgroundColor: "#1e1e1e",
+                    border: "1px solid #333",
+                    borderRadius: "5px",
+                    color: "white",
+                    fontSize: "1rem",
+                    resize: "vertical",
+                    opacity: isSubmittingProposal ? 0.7 : 1,
+                  }}
+                />
+              </div>
+
+              <button
+                onClick={handleProposalSubmit}
+                disabled={isSubmittingProposal}
+                style={{
+                  backgroundColor: "#00c853",
+                  color: "white",
+                  border: "none",
+                  padding: "12px",
+                  borderRadius: "5px",
+                  cursor: isSubmittingProposal ? "not-allowed" : "pointer",
+                  fontSize: "1rem",
+                  marginTop: "1rem",
+                  opacity: isSubmittingProposal ? 0.7 : 1,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                {isSubmittingProposal ? (
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                  }}>
+                    <span>Creating Proposal...</span>
+                    <div style={{
+                      width: "20px",
+                      height: "20px",
+                      border: "2px solid white",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                      animation: "spin 1s linear infinite",
+                    }} />
+                  </div>
+                ) : (
+                  "Submit Proposal"
+                )}
+              </button>
+
+              <p style={{
+                color: "#666",
+                fontSize: "0.9rem",
+                textAlign: "center",
+                marginTop: "1rem",
+              }}>
+                * Required fields
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MetaMask Button in Top Right */}
       <div
         style={{
