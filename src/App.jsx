@@ -50,6 +50,7 @@ function App() {
   const [voteCounts, setVoteCounts] = useState(null);
   const [currentAccount, setCurrentAccount] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Call updateCurrentAccount when component mounts and when account changes
   useEffect(() => {
@@ -320,85 +321,139 @@ function App() {
     }
   };
 
+  // Add disconnect function
+  const disconnectWallet = () => {
+    setCurrentAccount(null);
+    setShowDropdown(false);
+    setVoteCounts(null);
+  };
+
+  // Add change account function
+  const changeAccount = async () => {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      });
+      setShowDropdown(false);
+    } catch (error) {
+      console.error("Failed to change account:", error);
+    }
+  };
+
   return (
     <div
       style={{
-        height: "100vh",
+        minHeight: "100vh",
         width: "100vw",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
         backgroundColor: "#121212",
         fontFamily: "sans-serif",
+        position: "relative",
       }}
     >
+      {/* MetaMask Button in Top Right */}
+      <div
+        style={{
+          position: "absolute",
+          top: "1rem",
+          right: "1rem",
+          zIndex: 1000,
+        }}
+      >
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => currentAccount ? setShowDropdown(!showDropdown) : connectWallet()}
+            style={{
+              backgroundColor: "#f6851b",
+              color: "white",
+              border: "none",
+              padding: "10px 16px",
+              borderRadius: "5px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "1rem",
+              opacity: isConnecting ? 0.7 : 1
+            }}
+          >
+            <span role="img" aria-label="metamask">🦊</span>
+            {isConnecting ? "Connecting..." : currentAccount ? 
+              `${currentAccount.slice(0, 6)}...${currentAccount.slice(-4)}` : 
+              "Connect MetaMask"}
+          </button>
+
+          {/* Dropdown Menu */}
+          {showDropdown && currentAccount && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: "0.5rem",
+                backgroundColor: "#1e1e1e",
+                border: "1px solid #333",
+                borderRadius: "5px",
+                width: "200px",
+                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                zIndex: 1000,
+              }}
+            >
+              <button
+                onClick={changeAccount}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  textAlign: "left",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid #333",
+                  color: "white",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span role="img" aria-label="change">🔄</span>
+                Change Account
+              </button>
+              <button
+                onClick={disconnectWallet}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  textAlign: "left",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  color: "#ff4444",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <span role="img" aria-label="disconnect">⏏️</span>
+                Disconnect
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
       <div
         style={{
           width: "100%",
           maxWidth: 500,
-          textAlign: "center",
+          margin: "0 auto",
           padding: "2rem",
+          paddingTop: "4rem",
+          textAlign: "center",
           color: "white",
         }}
       >
         <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🗳️ Vote on Proposal</h1>
-        
-        {!window.ethereum ? (
-          <div style={{ marginBottom: "1rem" }}>
-            <button
-              onClick={() => window.open("https://metamask.io/download/", "_blank")}
-              style={{
-                backgroundColor: "#f6851b",
-                color: "white",
-                border: "none",
-                padding: "10px 16px",
-                borderRadius: "5px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto",
-                gap: "8px",
-                fontSize: "1rem"
-              }}
-            >
-              🦊 Install MetaMask
-            </button>
-          </div>
-        ) : !currentAccount ? (
-          <div style={{ marginBottom: "1rem" }}>
-            <button
-              onClick={connectWallet}
-              disabled={isConnecting}
-              style={{
-                backgroundColor: "#f6851b",
-                color: "white",
-                border: "none",
-                padding: "10px 16px",
-                borderRadius: "5px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto",
-                gap: "8px",
-                fontSize: "1rem",
-                opacity: isConnecting ? 0.7 : 1
-              }}
-            >
-              🦊 {isConnecting ? "Connecting..." : "Connect MetaMask"}
-            </button>
-          </div>
-        ) : (
-          <div style={{ 
-            fontSize: "0.8rem", 
-            color: "#888", 
-            marginBottom: "1rem",
-            wordBreak: "break-all"
-          }}>
-            Connected Account: {currentAccount}
-          </div>
-        )}
 
         {currentAccount && (
           <>
@@ -529,6 +584,21 @@ function App() {
           </>
         )}
       </div>
+
+      {/* Click handler to close dropdown when clicking outside */}
+      {showDropdown && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999,
+          }}
+          onClick={() => setShowDropdown(false)}
+        />
+      )}
     </div>
   );
 }
